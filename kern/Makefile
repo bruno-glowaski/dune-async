@@ -24,9 +24,9 @@ KSRC := /lib/modules/$(KVER)/build
 KMISC := /lib/modules/$(KVER)/kernel/drivers/misc
 KMISC_INC := /lib/modules/$(KVER)/include
 
-SYSCALL_TBL = 0x$(shell $(EXTRACT) sys_call_table)
-DO_FORK = 0x$(shell $(EXTRACT) do_fork)
-_DO_FORK = 0x$(shell $(EXTRACT) _do_fork)
+SYSCALL_TBL = 0x$(shell $(EXTRACT) sys_call_table $(EXTRACT_TARGET))
+DO_FORK = 0x$(shell $(EXTRACT) do_fork $(EXTRACT_TARGET))
+_DO_FORK = 0x$(shell $(EXTRACT) _do_fork $(EXTRACT_TARGET))
 
 CFLAGS_vmx.o = -DSYSCALL_TBL=$(SYSCALL_TBL) -DDO_FORK=$(DO_FORK) -D_DO_FORK=$(_DO_FORK)
 

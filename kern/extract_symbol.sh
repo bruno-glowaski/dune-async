@@ -1,34 +1,33 @@
 #!/bin/sh
 
-KVER=`uname -r`
-SYSTEM_MAP=/boot/System.map-$KVER
 SYM=$1
-
-extract()
-{
-	cat $SYSTEM_MAP | egrep " $SYM\$" | cut -d" " -f1
-	exit 0
-}
-
-check_file()
-{
-ls $1 2> /dev/null > /dev/null
-if [ $? -eq 0 ] ; then
-	extract
-fi
-}
-
-check_file $SYSTEM_MAP
-
-SYSTEM_MAP=/lib/modules/$KVER/build/System.map
-check_file $SYSTEM_MAP
-
-VMLINUX=/lib/modules/$KVER/build/vmlinux
-ls $VMLINUX 2> /dev/null > /dev/null
-if [ $? -eq 0 ] ; then
-	nm $VMLINUX | egrep " $SYM\$" | egrep " (R|T) " | cut -d" " -f1
-	exit 0
+TARGET="$2"
+KVER=$(uname -r)
+if [ -z $TARGET ]; then
+  TARGET="/boot/System.map-$KVER"
+  if [ -f $TARGET ]; then
+    TARGET=/lib/modules/$KVER/build/System.map
+    if [ -f $TARGET ]; then
+      TARGET=/lib/modules/$KVER/build/vmlinux
+      if [ -f $TARGET ]; then
+        printf "Error: couldn't find a target to extract symbols from. Try providing a path to a System.map or vmlinux file after the symbol name." &>2
+        exit 1
+      fi
+    fi
+  fi
 fi
 
-echo "FAILED - Can't find symbol!"
-exit 1
+case "$(file $TARGET | cut -d" " -f2)" in
+  "ELF")
+  # vmlinux 
+  nm $TARGET | egrep " $SYM\$" | egrep " (R|T) " | cut -d" " -f1
+  ;;
+  "ASCII")
+  # System.map
+	cat $TARGET | egrep " $SYM\$" | cut -d" " -f1
+  ;;
+  *) echo default
+    printf "Error: target is not System.map nor vmlinux." &>2
+  ;;
+esac
+
