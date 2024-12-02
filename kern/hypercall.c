@@ -1,5 +1,7 @@
+#include "asm/syscall.h"
 #include "dune.h"
 
+#include <asm/atomic.h>
 #include <linux/highmem.h>
 #include <linux/kthread.h>
 #include <linux/sched.h>
@@ -7,9 +9,44 @@
 
 int dune_proccess_cmd_channel(void *data) {
   struct dune_cmd_channel_config *config = data;
+  struct dune_cmd_channel *channel = config->kernel_addr;
+  struct dune_cmd_channel_call_slot current_call;
+  int i, j;
+  long syscall_ret;
 
+  /* TODO: Implement processing interruption */
   while (1) {
-    schedule();
+    for (i = 0; i < DUNE_CMD_CHANNEL_CALL_SLOTS; i++) {
+      if (atomic_read_acquire(&channel->calls[i].state) !=
+          DUNE_CMD_CHANNEL_SLOT_STATE_READY) {
+        continue;
+      }
+
+      current_call = channel->calls[i];
+      atomic_set_release(&channel->calls[i].state,
+                         DUNE_CMD_CHANNEL_SLOT_STATE_FREE);
+      syscall_ret = sys_call_table[current_call.id](
+          current_call.arg1, current_call.arg2, current_call.arg3,
+          current_call.arg4, current_call.arg5, current_call.arg6);
+
+      while (1) {
+        for (j = 0; j < DUNE_CMD_CHANNEL_EVENT_SLOTS; j++) {
+          if (atomic_read_acquire(&channel->events[i].state) !=
+              DUNE_CMD_CHANNEL_SLOT_STATE_FREE) {
+            continue;
+          }
+        }
+        if (j < DUNE_CMD_CHANNEL_EVENT_SLOTS) {
+          break;
+        }
+        schedule();
+      }
+
+      channel->events[i].tag = current_call.tag;
+      channel->events[i].ret = syscall_ret;
+      atomic_set_release(&channel->events[i].state,
+                         DUNE_CMD_CHANNEL_SLOT_STATE_READY);
+    }
   }
 
   kunmap(config->page);
