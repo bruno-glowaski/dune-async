@@ -26,4 +26,6 @@ test/test
 test/test_sandbox
 test/timetest
 tags
+
 compile_commands.json
+.cache/
